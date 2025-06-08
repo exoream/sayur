@@ -18,7 +18,7 @@ app.use(cors());
 app.get("/", (req, res) => {
   res.json({
     status: true,
-    message: "Gapakerem",
+    message: "Sayur API is running",
   });
 });
 
