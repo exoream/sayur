@@ -31,7 +31,7 @@ router.put(
 );
 
 router.get(
-  "/expenses/all",
+  "/expenses/all/:itemId",
   jwtMiddleware,
   expenseController.getAllExpenses.bind(expenseController)
 );

@@ -19,7 +19,7 @@ router.delete(
 );
 
 router.get(
-  "/incomes/all",
+  "/incomes/all/:itemId",
   jwtMiddleware,
   incomeController.getAllIncomes.bind(incomeController)
 );

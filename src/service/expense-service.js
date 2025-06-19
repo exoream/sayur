@@ -247,9 +247,17 @@ class ExpenseService {
 
   static async getAllExpenses(request) {
     const userId = request.user.id;
+    const itemId = Number(request.params.itemId);
+
+    if (!itemId || isNaN(itemId)) {
+      throw new Error("Parameter itemId tidak valid");
+    }
 
     const expenses = await prisma.expense.findMany({
-      where: { userId },
+      where: {
+        userId,
+        itemId,
+      },
       include: {
         item: {
           select: {
@@ -264,15 +272,23 @@ class ExpenseService {
       },
     });
 
-    const formattedExpenses = expenses.map((expense) => ({
+    if (!expenses.length) {
+      return {
+        status: true,
+        message: `Tidak ada data pengeluaran untuk itemId ${itemId}`,
+        data: [],
+      };
+    }
+
+    const { name, type } = expenses[0].item;
+
+    const items = expenses.map((expense) => ({
       id: expense.id,
-      itemId: expense.itemId,
-      itemName: expense.item.name,
-      itemType: expense.item.type,
       type: expense.type,
       totalQuantityKg: expense.totalQuantityKg,
       totalPrice: expense.total,
       note: expense.note,
+      createdAt: expense.createdAt,
       details:
         expense.type === "VEGETABLE"
           ? expense.vegetableDetails.map((detail) => ({
@@ -288,7 +304,12 @@ class ExpenseService {
           : [],
     }));
 
-    return formattedExpenses;
+    return {
+      itemId,
+      itemName: name,
+      itemType: type,
+      items,
+    };
   }
 
   static async getExpenseDetailById(request) {
@@ -405,9 +426,7 @@ class ExpenseService {
 
     console.log("Payload diterima:", request.body);
 
-    const payload = ExpenseValidation.updateExpenseSchema.parse(
-      request.body
-    );
+    const payload = ExpenseValidation.updateExpenseSchema.parse(request.body);
 
     const existingExpense = await prisma.expense.findFirst({
       where: { id: expenseId, userId },

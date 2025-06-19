@@ -4,7 +4,6 @@ const { ResponseError } = require("../utils/response/response");
 const IncomeValidation = require("../utils/validation/income-validation");
 const { startOfDay, endOfDay } = require("date-fns");
 
-
 class IncomeService {
   static async createIncome(request) {
     const userId = request.user.id;
@@ -134,11 +133,7 @@ class IncomeService {
       return acc;
     }, {});
 
-    const groupedArray = Object.values(grouped);
-
-    return {
-      groupedArray,
-    };
+    return Object.values(grouped);
   }
 
   static async getIncomeDetailsByDateAndItemId(request) {
@@ -146,17 +141,12 @@ class IncomeService {
     const { itemId } = request.params;
     const { date } = request.query;
 
-    if (!date) {
-      throw new ResponseError("Parameter date wajib diisi", 400);
-    }
-    if (!itemId) {
-      throw new ResponseError("Parameter itemId wajib diisi", 400);
-    }
+    if (!date) throw new ResponseError("Parameter date wajib diisi", 400);
+    if (!itemId) throw new ResponseError("Parameter itemId wajib diisi", 400);
 
     const parsedDate = new Date(date);
-    if (isNaN(parsedDate)) {
+    if (isNaN(parsedDate))
       throw new ResponseError("Format date tidak valid (YYYY-MM-DD)", 400);
-    }
 
     const start = startOfDay(parsedDate);
     const end = endOfDay(parsedDate);
@@ -171,11 +161,9 @@ class IncomeService {
         },
       },
       select: {
-        id: true,
         totalPrice: true,
         totalQuantityKg: true,
         note: true,
-        createdAt: true,
         item: {
           select: {
             name: true,
@@ -190,59 +178,53 @@ class IncomeService {
             pricePerKg: true,
             totalPrice: true,
             note: true,
-            createdAt: true,
           },
         },
       },
     });
 
     if (!incomes.length) {
-      return {
-        status: true,
-        message: `Tidak ada income dengan itemId ${itemId} pada tanggal ${date}`,
-        data: [],
-      };
+      return null;
     }
 
     let totalQuantityKg = 0;
     let totalPrice = 0;
+    const allDetails = [];
+
     incomes.forEach((income) => {
       totalQuantityKg += income.totalQuantityKg ?? 0;
       totalPrice += income.totalPrice ?? 0;
+      allDetails.push(...income.incomeDetails);
     });
 
     const { item } = incomes[0];
 
     return {
-      status: true,
-      message: `Detail income untuk itemId ${itemId} pada tanggal ${date}`,
-      data: {
-        itemId: Number(itemId),
-        itemName: item.name,
-        itemType: item.type,
-        totalQuantityKg,
-        totalPrice,
-        incomes: incomes.map((income) => ({
-          id: income.id,
-          note: income.note,
-          createdAt: income.createdAt,
-          totalQuantityKg: income.totalQuantityKg,
-          totalPrice: income.totalPrice,
-          incomeDetails: income.incomeDetails,
-        })),
-      },
+      itemId: Number(itemId),
+      itemName: item.name,
+      itemType: item.type,
+      totalQuantityKg,
+      totalPrice,
+      details: allDetails,
     };
   }
 
   static async getAllIncomes(request) {
     const userId = request.user.id;
+    const itemId = Number(request.params.itemId);
+
+    if (!itemId || isNaN(itemId)) {
+      throw new ResponseError("Parameter itemId tidak valid", 400);
+    }
 
     const incomes = await prisma.income.findMany({
-      where: { userId },
+      where: {
+        userId,
+        itemId,
+      },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
-        itemId: true,
         totalPrice: true,
         totalQuantityKg: true,
         note: true,
@@ -268,15 +250,25 @@ class IncomeService {
     });
 
     if (!incomes.length) {
-      return {
-        status: true,
-        message: "Belum ada data income",
-        data: [],
-      };
+      return null;
     }
 
+    const { name, type } = incomes[0].item;
+
+    const items = incomes.map((income) => ({
+      id: income.id,
+      totalPrice: income.totalPrice,
+      totalQuantityKg: income.totalQuantityKg,
+      note: income.note,
+      createdAt: income.createdAt,
+      details: income.incomeDetails,
+    }));
+
     return {
-      incomes,
+      itemId,
+      itemName: name,
+      itemType: type,
+      items,
     };
   }
 
@@ -288,7 +280,7 @@ class IncomeService {
       throw new ResponseError("Parameter incomeId wajib diisi", 400);
     }
 
-    const incomes = await prisma.income.findFirst({
+    const income = await prisma.income.findFirst({
       where: {
         id: Number(incomeId),
         userId,
@@ -322,7 +314,7 @@ class IncomeService {
       },
     });
 
-    if (!incomes) {
+    if (!income) {
       throw new ResponseError(
         `Income dengan id ${incomeId} tidak ditemukan`,
         404
@@ -330,7 +322,25 @@ class IncomeService {
     }
 
     return {
-      incomes,
+      id: income.id,
+      itemId: income.itemId,
+      itemName: income.item.name,
+      itemType: income.item.type,
+      totalQuantityKg: income.totalQuantityKg,
+      totalPrice: income.totalPrice,
+      note: income.note,
+      createdAt: income.createdAt,
+      updatedAt: income.updatedAt,
+      details: income.incomeDetails.map((detail) => ({
+        id: detail.id,
+        buyerName: detail.buyerName,
+        quantityKg: detail.quantityKg,
+        pricePerKg: detail.pricePerKg,
+        totalPrice: detail.totalPrice,
+        note: detail.note,
+        createdAt: detail.createdAt,
+        updatedAt: detail.updatedAt,
+      })),
     };
   }
 
