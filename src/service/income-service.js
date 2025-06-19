@@ -184,7 +184,10 @@ class IncomeService {
     });
 
     if (!incomes.length) {
-      return null;
+      throw new ResponseError(
+        `Tidak ada data pemasukan untuk itemId ${itemId} pada tanggal ${date}`,
+        404
+      );
     }
 
     let totalQuantityKg = 0;
@@ -250,7 +253,10 @@ class IncomeService {
     });
 
     if (!incomes.length) {
-      return null;
+      throw new ResponseError(
+        `Tidak ada data pengeluaran untuk itemId ${itemId}`,
+        404
+      );
     }
 
     const { name, type } = incomes[0].item;

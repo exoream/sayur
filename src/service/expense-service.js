@@ -194,11 +194,10 @@ class ExpenseService {
     });
 
     if (expenses.length === 0) {
-      return {
-        status: true,
-        message: `Tidak ada data pengeluaran untuk item ID ${itemId} pada tanggal ${date}`,
-        data: [],
-      };
+      throw new ResponseError(
+        `Tidak ada data pengeluaran untuk itemId ${itemId} pada tanggal ${date}`,
+        404
+      );
     }
 
     const result = {
@@ -273,11 +272,10 @@ class ExpenseService {
     });
 
     if (!expenses.length) {
-      return {
-        status: true,
-        message: `Tidak ada data pengeluaran untuk itemId ${itemId}`,
-        data: [],
-      };
+      throw new ResponseError(
+        `Tidak ada data pengeluaran untuk itemId ${itemId}`,
+        404
+      );
     }
 
     const { name, type } = expenses[0].item;
