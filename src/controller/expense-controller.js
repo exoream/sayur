@@ -74,10 +74,21 @@ class ExpenseController {
 
     async updateExpenseById(req, res, next) {
         try {
-            const expense = await ExpenseService.updateExpenseById(req);
+            const expense = await ExpenseService.updateExpenseDetailById(req);
             return res
                 .status(200)
                 .json(successResponse("Berhasil memperbarui pengeluaran", expense));
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async deleteExpenseDetailById(req, res, next) {
+        try {
+            await ExpenseService.deleteExpenseDetailById(req);
+            return res
+                .status(200)
+                .json(successResponse("Berhasil menghapus detail pengeluaran"));
         } catch (error) {
             next(error);
         }

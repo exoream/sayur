@@ -409,120 +409,138 @@ class ExpenseService {
     });
   }
 
-  static async updateExpenseById(request) {
+  static async deleteExpenseDetailById(request) {
     const userId = request.user.id;
-    const { id } = request.params;
+    const expenseDetailId = Number(request.params.expenseDetailId);
 
-    if (!id) {
-      throw new ResponseError("Parameter id wajib diisi", 400);
+    if (isNaN(expenseDetailId)) {
+      throw new ResponseError("Parameter expenseDetailId tidak valid", 400);
     }
 
-    const expenseId = parseInt(id);
-    if (isNaN(expenseId)) {
-      throw new ResponseError("Parameter id tidak valid", 400);
-    }
-
-    console.log("Payload diterima:", request.body);
-
-    const payload = ExpenseValidation.updateExpenseSchema.parse(request.body);
-
-    const existingExpense = await prisma.expense.findFirst({
-      where: { id: expenseId, userId },
-      include: { vegetableDetails: true },
-    });
-
-    if (!existingExpense) {
-      throw new ResponseError("Pengeluaran tidak ditemukan", 404);
-    }
-
-    if (existingExpense.type !== payload.type) {
-      if (existingExpense.type === "VEGETABLE" && payload.type === "OTHER") {
-        await prisma.vegetableExpenseDetail.deleteMany({
-          where: { expenseId },
-        });
-      }
-    }
-
-    if (payload.type === "VEGETABLE") {
-      if (!payload.vegetableDetails || payload.vegetableDetails.length === 0) {
-        throw new ResponseError(
-          "Detail sayuran wajib diisi untuk tipe VEGETABLE",
-          400
-        );
-      }
-
-      const totalQuantityKg = payload.vegetableDetails.reduce(
-        (sum, d) => sum + d.quantityKg,
-        0
-      );
-      const totalPrice = payload.vegetableDetails.reduce(
-        (sum, d) => sum + d.quantityKg * d.pricePerKg,
-        0
-      );
-
-      await prisma.vegetableExpenseDetail.deleteMany({
-        where: { expenseId },
-      });
-
-      await prisma.expense.update({
-        where: { id: expenseId },
-        data: {
-          itemId: payload.itemId,
-          type: payload.type,
-          totalQuantityKg,
-          total: totalPrice,
-          note: payload.note ?? null,
+    const detail = await prisma.vegetableExpenseDetail.findFirst({
+      where: {
+        id: expenseDetailId,
+        expense: {
+          userId,
         },
-      });
-
-      await prisma.vegetableExpenseDetail.createMany({
-        data: payload.vegetableDetails.map((d) => ({
-          expenseId,
-          farmerName: d.farmerName,
-          phone: d.phone ?? null,
-          address: d.address ?? null,
-          quantityKg: d.quantityKg,
-          pricePerKg: d.pricePerKg,
-          totalPrice: d.quantityKg * d.pricePerKg,
-        })),
-      });
-    } else if (payload.type === "OTHER") {
-      if (typeof payload.total !== "number" || payload.total <= 0) {
-        throw new ResponseError(
-          "Total wajib diisi dan harus lebih dari 0 untuk tipe OTHER",
-          400
-        );
-      }
-
-      if (!payload.note || payload.note.trim() === "") {
-        throw new ResponseError("Catatan wajib diisi untuk tipe OTHER", 400);
-      }
-
-      await prisma.vegetableExpenseDetail.deleteMany({
-        where: { expenseId },
-      });
-
-      await prisma.expense.update({
-        where: { id: expenseId },
-        data: {
-          itemId: payload.itemId,
-          type: payload.type,
-          total: payload.total,
-          note: payload.note,
-          totalQuantityKg: null,
-        },
-      });
-    }
-
-    const updatedExpense = await prisma.expense.findFirst({
-      where: { id: expenseId, userId },
+      },
       include: {
-        vegetableDetails: true,
-        item: true,
+        expense: true,
       },
     });
 
-    return updatedExpense;
+    if (!detail) {
+      throw new ResponseError(
+        `Detail pengeluaran dengan id ${expenseDetailId} tidak ditemukan`,
+        404
+      );
+    }
+
+    await prisma.vegetableExpenseDetail.delete({
+      where: {
+        id: expenseDetailId,
+      },
+    });
+
+    const aggregate = await prisma.vegetableExpenseDetail.aggregate({
+      where: {
+        expenseId: detail.expenseId,
+      },
+      _sum: {
+        quantityKg: true,
+        totalPrice: true,
+      },
+    });
+
+    await prisma.expense.update({
+      where: { id: detail.expenseId },
+      data: {
+        totalQuantityKg: aggregate._sum.quantityKg ?? 0,
+        total: aggregate._sum.totalPrice ?? 0,
+        updatedAt: new Date(),
+      },
+    });
+  }
+
+  static async updateExpenseDetailById(request) {
+    const userId = request.user.id;
+    const { expenseDetailId } = request.params;
+    const { farmerName, quantityKg, pricePerKg, phone, address, note } =
+      request.body;
+
+    if (!expenseDetailId) {
+      throw new ResponseError("Parameter expenseDetailId wajib diisi", 400);
+    }
+
+    ExpenseValidation.updateVegetableDetailSchema.parse(request.body);
+
+    const detail = await prisma.vegetableExpenseDetail.findFirst({
+      where: {
+        id: Number(expenseDetailId),
+        expense: {
+          userId,
+        },
+      },
+      include: {
+        expense: true,
+      },
+    });
+
+    if (!detail) {
+      throw new ResponseError(
+        `Detail pengeluaran dengan id ${expenseDetailId} tidak ditemukan`,
+        404
+      );
+    }
+
+    // Hitung totalPrice baru
+    const newQuantity = quantityKg ?? detail.quantityKg;
+    const newPrice = pricePerKg ?? detail.pricePerKg;
+    const totalPrice = newQuantity * newPrice;
+
+    // Update detail
+    const updatedDetail = await prisma.vegetableExpenseDetail.update({
+      where: { id: Number(expenseDetailId) },
+      data: {
+        farmerName: farmerName ?? detail.farmerName,
+        quantityKg: newQuantity,
+        pricePerKg: newPrice,
+        totalPrice,
+        phone: phone ?? detail.phone,
+        address: address ?? detail.address,
+        note: note ?? detail.note,
+        updatedAt: new Date(),
+      },
+    });
+
+    // Update rekap di tabel expense
+    const recalc = await prisma.vegetableExpenseDetail.aggregate({
+      where: { expenseId: detail.expenseId },
+      _sum: {
+        quantityKg: true,
+        totalPrice: true,
+      },
+    });
+
+    await prisma.expense.update({
+      where: { id: detail.expenseId },
+      data: {
+        totalQuantityKg: recalc._sum.quantityKg ?? 0,
+        total: recalc._sum.totalPrice ?? 0,
+        updatedAt: new Date(),
+      },
+    });
+
+    return {
+      id: updatedDetail.id,
+      farmerName: updatedDetail.farmerName,
+      quantityKg: updatedDetail.quantityKg,
+      pricePerKg: updatedDetail.pricePerKg,
+      totalPrice: updatedDetail.totalPrice,
+      phone: updatedDetail.phone,
+      address: updatedDetail.address,
+      note: updatedDetail.note,
+    };
   }
 }
 

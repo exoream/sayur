@@ -449,6 +449,62 @@ class IncomeService {
       updatedDetail,
     };
   }
+
+  static async deleteIncomeDetailById(request) {
+    const userId = request.user.id;
+    const { incomeDetailId } = request.params;
+
+    if (!incomeDetailId) {
+      throw new ResponseError("Parameter incomeDetailId wajib diisi", 400);
+    }
+
+    // Cari incomeDetail dan pastikan milik user
+    const incomeDetail = await prisma.incomeDetail.findFirst({
+      where: {
+        id: Number(incomeDetailId),
+        income: {
+          userId,
+        },
+      },
+    });
+
+    if (!incomeDetail) {
+      throw new ResponseError(
+        `IncomeDetail dengan id ${incomeDetailId} tidak ditemukan`,
+        404
+      );
+    }
+
+    // Hapus incomeDetail
+    await prisma.incomeDetail.delete({
+      where: {
+        id: Number(incomeDetailId),
+      },
+    });
+
+    // Hitung ulang total income parent-nya
+    const updatedTotal = await prisma.incomeDetail.aggregate({
+      where: {
+        incomeId: incomeDetail.incomeId,
+      },
+      _sum: {
+        totalPrice: true,
+        quantityKg: true,
+      },
+    });
+
+    // Update income utama
+    await prisma.income.update({
+      where: {
+        id: incomeDetail.incomeId,
+      },
+      data: {
+        totalPrice: updatedTotal._sum.totalPrice ?? 0,
+        totalQuantityKg: updatedTotal._sum.quantityKg ?? 0,
+        updatedAt: new Date(),
+      },
+    });
+  }
 }
 
 module.exports = IncomeService;

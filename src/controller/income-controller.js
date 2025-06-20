@@ -42,7 +42,9 @@ class IncomeController {
       const incomes = await IncomeService.getAllIncomes(req);
       return res
         .status(200)
-        .json(successResponse("Berhasil mendapatkan semua pendapatan", incomes));
+        .json(
+          successResponse("Berhasil mendapatkan semua pendapatan", incomes)
+        );
     } catch (error) {
       next(error);
     }
@@ -53,7 +55,9 @@ class IncomeController {
       const income = await IncomeService.getIncomeDetailById(req);
       return res
         .status(200)
-        .json(successResponse("Berhasil mendapatkan detail pendapatan", income));
+        .json(
+          successResponse("Berhasil mendapatkan detail pendapatan", income)
+        );
     } catch (error) {
       next(error);
     }
@@ -75,7 +79,20 @@ class IncomeController {
       const income = await IncomeService.updateIncomeDetailById(req);
       return res
         .status(200)
-        .json(successResponse("Berhasil memperbarui detail pendapatan", income));
+        .json(
+          successResponse("Berhasil memperbarui detail pendapatan", income)
+        );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteIncomeDetailById(req, res, next) {
+    try {
+      await IncomeService.deleteIncomeDetailById(req);
+      return res
+        .status(200)
+        .json(successResponse("Berhasil menghapus detail pendapatan"));
     } catch (error) {
       next(error);
     }

@@ -12,12 +12,6 @@ router.post(
   incomeController.createIncome.bind(incomeController)
 );
 
-router.delete(
-  "/incomes/:incomeId",
-  jwtMiddleware,
-  incomeController.deleteIncomeById.bind(incomeController)
-);
-
 router.get(
   "/incomes/all/:itemId",
   jwtMiddleware,
@@ -36,10 +30,16 @@ router.put(
   incomeController.updateIncomeDetailById.bind(incomeController)
 );
 
+router.delete(
+  "/incomes/detail/:incomeDetailId",
+  jwtMiddleware,
+  incomeController.deleteIncomeDetailById.bind(incomeController)
+);
+
 router.get(
   "/incomes",
-    jwtMiddleware,
-    incomeController.getIncomesByDate.bind(incomeController)
+  jwtMiddleware,
+  incomeController.getIncomesByDate.bind(incomeController)
 );
 
 router.get(
@@ -48,5 +48,10 @@ router.get(
   incomeController.getIncomeDetailsByDateAndItemId.bind(incomeController)
 );
 
+router.delete(
+  "/incomes/:incomeId",
+  jwtMiddleware,
+  incomeController.deleteIncomeById.bind(incomeController)
+);
 
 module.exports = router;

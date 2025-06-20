@@ -102,6 +102,23 @@ class ExpenseValidation {
         message: "Minimal satu field harus diupdate",
       }
     );
+
+  static updateVegetableDetailSchema = z.object({
+    farmerName: z.string().min(1, "Nama petani wajib diisi").optional(),
+    quantityKg: z.number().positive("Quantity harus lebih dari 0").optional(),
+    pricePerKg: z
+      .number()
+      .int()
+      .positive("Harga per kg harus lebih dari 0")
+      .optional(),
+    phone: z
+      .string()
+      .min(8, "Nomor telepon minimal 8 karakter")
+      .max(20, "Nomor telepon maksimal 20 karakter")
+      .optional(),
+    address: z.string().min(1, "Alamat wajib diisi").optional(),
+    note: z.string().optional(),
+  });
 }
 
 module.exports = ExpenseValidation;

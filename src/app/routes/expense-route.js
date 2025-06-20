@@ -13,9 +13,9 @@ router.post(
 );
 
 router.get(
-    "/expenses",
-    jwtMiddleware,
-    expenseController.getExpensesByDate.bind(expenseController)
+  "/expenses",
+  jwtMiddleware,
+  expenseController.getExpensesByDate.bind(expenseController)
 );
 
 router.delete(
@@ -24,8 +24,14 @@ router.delete(
   expenseController.deleteExpenseById.bind(expenseController)
 );
 
+router.delete(
+  "/expenses/detail/:expenseDetailId",
+  jwtMiddleware,
+  expenseController.deleteExpenseDetailById.bind(expenseController)
+);
+
 router.put(
-  "/expenses/:id",
+  "/expenses/:expenseDetailId",
   jwtMiddleware,
   expenseController.updateExpenseById.bind(expenseController)
 );
@@ -47,10 +53,5 @@ router.get(
   jwtMiddleware,
   expenseController.getExpenseDetailsByDateAndItemId.bind(expenseController)
 );
-
-
-
-
-
 
 module.exports = router;
