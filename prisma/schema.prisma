@@ -55,7 +55,7 @@ model Expense {
   user        User         @relation(fields: [userId], references: [id])
   userId      Int
   
-  item        Item         @relation(fields: [itemId], references: [id])
+  item        Item         @relation(fields: [itemId], references: [id], onDelete: Cascade)
   itemId      Int
 
   type        ExpenseType
@@ -96,7 +96,7 @@ model Income {
   user      User        @relation(fields: [userId], references: [id])
   userId    Int
 
-  item      Item        @relation(fields: [itemId], references: [id])
+  item      Item        @relation(fields: [itemId], references: [id], onDelete: Cascade)
   itemId    Int
 
   totalPrice Int
