@@ -108,8 +108,8 @@ class UserService {
       throw new ResponseError("Format foto harus JPG, JPEG, atau PNG", 400);
     }
 
-    if (request.file && request.file.size > 2 * 1024 * 1024) {
-      throw new ResponseError("Ukuran foto maksimal 2MB", 400);
+    if (request.file && request.file.size > 5 * 1024 * 1024) {
+      throw new ResponseError("Ukuran foto maksimal 5MB", 400);
     }
 
     let photoUrl = existingUser.photo;

@@ -2,12 +2,21 @@ const { z } = require("zod");
 
 class ExpenseValidation {
   static vegetableDetailSchema = z.object({
-    farmerName: z.string().min(1, "Nama petani wajib diisi"),
-    phone: z.string().optional(),
-    address: z.string().optional(),
+    farmerName: z
+      .string()
+      .min(1, "Nama petani wajib diisi")
+      .refine((val) => !/\d/.test(val), {
+        message: "Nama petani tidak boleh mengandung angka",
+      }),
+    phone: z
+      .string()
+      .min(10, "Nomor HP minimal 10 digit")
+      .max(15, "Nomor HP maksimal 15 digit")
+      .optional(),
+    address: z.string().min(5, "Alamat minimal 5 karakter").optional(),
     quantityKg: z.number().positive("Jumlah kg harus lebih dari 0"),
     pricePerKg: z.number().int().positive("Harga per kg harus lebih dari 0"),
-    note: z.string().optional(),
+    note: z.string().min(5, "Catatan minimal 5 karakter").optional(),
   });
 
   static createExpenseSchema = z
@@ -15,7 +24,7 @@ class ExpenseValidation {
       itemId: z.number().int().positive("Item ID wajib diisi"),
       type: z.enum(["VEGETABLE", "OTHER"]),
       total: z.number().int().positive("Total wajib diisi").optional(),
-      note: z.string().optional(),
+      note: z.string().min(5, "Catatan minimal 5 karakter").optional(),
       vegetableDetails: z.array(this.vegetableDetailSchema).optional(),
     })
     .superRefine((data, ctx) => {
@@ -52,7 +61,7 @@ class ExpenseValidation {
       itemId: z.number().int().positive("Item ID wajib diisi").optional(),
       type: z.enum(["VEGETABLE", "OTHER"]).optional(),
       total: z.number().int().positive("Total wajib diisi").optional(),
-      note: z.string().optional(),
+      note: z.string().min(5, "Catatan minimal 5 karakter").optional(),
       vegetableDetails: z.array(this.vegetableDetailSchema).optional(),
     })
     .superRefine((data, ctx) => {
@@ -90,7 +99,7 @@ class ExpenseValidation {
       itemId: z.number().int().positive("Item ID wajib diisi").optional(),
       type: z.enum(["VEGETABLE", "OTHER"]).optional(),
       total: z.number().int().positive("Total wajib diisi").optional(),
-      note: z.string().optional(),
+      note: z.string().min(5, "Catatan minimal 5 karakter").optional(),
       vegetableDetails: z.array(this.vegetableDetailSchema).optional(),
     })
     .refine(
@@ -104,7 +113,13 @@ class ExpenseValidation {
     );
 
   static updateVegetableDetailSchema = z.object({
-    farmerName: z.string().min(1, "Nama petani wajib diisi").optional(),
+    farmerName: z
+      .string()
+      .min(1, "Nama petani wajib diisi")
+      .refine((val) => !/\d/.test(val), {
+        message: "Nama petani tidak boleh mengandung angka",
+      })
+      .optional(),
     quantityKg: z.number().positive("Quantity harus lebih dari 0").optional(),
     pricePerKg: z
       .number()
@@ -113,11 +128,11 @@ class ExpenseValidation {
       .optional(),
     phone: z
       .string()
-      .min(8, "Nomor telepon minimal 8 karakter")
-      .max(20, "Nomor telepon maksimal 20 karakter")
+      .min(10, "Nomor telepon minimal 10 karakter")
+      .max(15, "Nomor telepon maksimal 15 karakter")
       .optional(),
-    address: z.string().min(1, "Alamat wajib diisi").optional(),
-    note: z.string().optional(),
+    address: z.string().min(5, "Alamat minimal 5 karakter").optional(),
+    note: z.string().min(5, "Catatan minimal 5 karakter").optional(),
   });
 }
 
