@@ -114,7 +114,8 @@ class LovItemService {
     return result;
   }
 
-  static async deleteLovItem(id) {
+  static async deleteLovItem(req) {
+    const { id } = req.params;
     const existing = await prisma.lovItem.findUnique({
       where: { id: Number(id) },
     });
