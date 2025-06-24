@@ -170,6 +170,10 @@ class UserService {
     const { old_password: oldPassword, new_password: newPassword } =
       request.body;
 
+    if (!newPassword || newPassword.length < 8) {
+      throw new ResponseError("Password baru minimal harus 8 karakter", 400);
+    }
+
     const existingUser = await prisma.user.findUnique({
       where: { id: userId },
     });

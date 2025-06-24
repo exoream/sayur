@@ -5,7 +5,7 @@ class UserValidation {
     name: z
       .string()
       .min(2, "Nama minimum 2 characters")
-      .max(50, "Nama maximum 50 characters")
+      .max(30, "Nama maximum 30 characters")
       .regex(/^[a-zA-Z\s]+$/, "Nama hanya boleh mengandung huruf dan spasi")
       .nonempty("Nama wajib diisi"),
     password: z

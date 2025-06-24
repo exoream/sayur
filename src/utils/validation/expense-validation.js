@@ -5,6 +5,7 @@ class ExpenseValidation {
     farmerName: z
       .string()
       .min(1, "Nama petani wajib diisi")
+      .max(30, "Nama petani maksimal 30 karakter")
       .refine((val) => !/\d/.test(val), {
         message: "Nama petani tidak boleh mengandung angka",
       }),
@@ -13,9 +14,29 @@ class ExpenseValidation {
       .min(10, "Nomor HP minimal 10 digit")
       .max(15, "Nomor HP maksimal 15 digit")
       .optional(),
-    address: z.string().min(5, "Alamat minimal 5 karakter").optional(),
-    quantityKg: z.number().positive("Jumlah kg harus lebih dari 0"),
-    pricePerKg: z.number().int().positive("Harga per kg harus lebih dari 0"),
+    address: z
+      .string()
+      .min(4, "Alamat minimal 4 karakter")
+      .max(50, "Alamat maksimal 50 karakter")
+      .optional(),
+    quantityKg: z
+      .number({ invalid_type_error: "Jumlah kg harus berupa angka" })
+      .positive("Jumlah kg harus lebih dari 0")
+      .refine((val) => val >= 1, {
+        message: "Jumlah kg minimal 1",
+      })
+      .refine((val) => val.toString().length <= 6, {
+        message: "Jumlah kg maksimal 6 digit",
+      }),
+    pricePerKg: z
+      .number({ invalid_type_error: "Harga per kg harus berupa angka" })
+      .positive("Harga per kg harus lebih dari 0")
+      .refine((val) => val.toString().length >= 4, {
+        message: "Harga per kg minimal 4 digit",
+      })
+      .refine((val) => val.toString().length <= 6, {
+        message: "Harga per kg maksimal 6 digit",
+      }),
     note: z.string().min(5, "Catatan minimal 5 karakter").optional(),
   });
 
@@ -131,7 +152,7 @@ class ExpenseValidation {
       .min(10, "Nomor telepon minimal 10 karakter")
       .max(15, "Nomor telepon maksimal 15 karakter")
       .optional(),
-    address: z.string().min(5, "Alamat minimal 5 karakter").optional(),
+    address: z.string().min(4, "Alamat minimal 4 karakter").optional(),
     note: z.string().min(5, "Catatan minimal 5 karakter").optional(),
   });
 }
