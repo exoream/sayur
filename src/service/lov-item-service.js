@@ -1,16 +1,20 @@
 const cloudinary = require("../app/config/cloudinary");
 const prisma = require("../app/config/config");
 const { ResponseError } = require("../utils/response/response");
+const LovValidation = require("../utils/validation/lov-validation");
+const Validation = require("../utils/validation/validation");
+
 
 class LovItemService {
   static async createLovItem(request) {
-    const { name, type } = request.body;
     const file = request.file;
 
-    if (!name || !type) {
-      throw new ResponseError("Field name dan type wajib diisi", 400);
-    }
+    const validated = Validation.validate(
+      LovValidation.createLovSchema,
+      request.body
+    );
 
+    // Validasi file foto
     if (!file) {
       throw new ResponseError("Foto wajib diunggah", 400);
     }
@@ -34,8 +38,8 @@ class LovItemService {
 
     const newLov = await prisma.lovItem.create({
       data: {
-        name,
-        type,
+        name: validated.name,
+        type: validated.type,
         photo: photoUrl,
       },
       select: { id: true, name: true, type: true, photo: true },
@@ -66,7 +70,12 @@ class LovItemService {
 
   static async updateLovItem(request) {
     const { id } = request.params;
-    const { name, type } = request.body;
+    const file = request.file;
+
+    const validated = Validation.validate(
+      LovValidation.updateLovSchema,
+      request.body
+    );
 
     const existingLovItem = await prisma.lovItem.findUnique({
       where: { id: Number(id) },
@@ -76,26 +85,27 @@ class LovItemService {
     if (!existingLovItem)
       throw new ResponseError("LovItem tidak ditemukan", 404);
 
+    // Validasi file jika ada
     if (
-      request.file &&
-      !["image/jpeg", "image/jpg", "image/png"].includes(request.file.mimetype)
+      file &&
+      !["image/jpeg", "image/jpg", "image/png"].includes(file.mimetype)
     ) {
       throw new ResponseError("Format foto harus JPG, JPEG, atau PNG", 400);
     }
 
-    if (request.file && request.file.size > 5 * 1024 * 1024) {
+    if (file && file.size > 5 * 1024 * 1024) {
       throw new ResponseError("Ukuran foto maksimal 5MB", 400);
     }
 
     let photoUrl = existingLovItem.photo;
-    if (request.file) {
+    if (file) {
       const uploadResult = await new Promise((resolve, reject) => {
         cloudinary.uploader
           .upload_stream({ folder: "lov-item" }, (error, result) => {
             if (error) reject(new ResponseError("Gagal mengunggah foto", 500));
             else resolve(result.secure_url);
           })
-          .end(request.file.buffer);
+          .end(file.buffer);
       });
 
       photoUrl = uploadResult;
@@ -104,8 +114,8 @@ class LovItemService {
     const result = await prisma.lovItem.update({
       where: { id: Number(id) },
       data: {
-        name,
-        type,
+        name: validated.name,
+        type: validated.type,
         photo: photoUrl,
       },
       select: { id: true, name: true, type: true, photo: true },
