@@ -2,7 +2,13 @@ const Validation = require("../utils/validation/validation");
 const prisma = require("../app/config/config");
 const { ResponseError } = require("../utils/response/response");
 const IncomeValidation = require("../utils/validation/income-validation");
-const { startOfDay, endOfDay } = require("date-fns");
+// const { startOfDay, endOfDay } = require("date-fns");
+const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const timezone = require("dayjs/plugin/timezone");
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 class IncomeService {
   static async createIncome(request) {
@@ -26,10 +32,8 @@ class IncomeService {
 
     let totalQuantityKg = 0;
     let totalPrice = 0;
-
     const createdIncomeWithDetails = await prisma.$transaction(
       async (tx) => {
-        // Buat data income utama terlebih dahulu
         const income = await tx.income.create({
           data: {
             userId,
@@ -40,8 +44,7 @@ class IncomeService {
           },
         });
 
-        // Persiapkan seluruh data incomeDetail dalam bentuk array
-        const incomeDetailsData = incomesDetails.map((detail) => {
+        for (const detail of incomesDetails) {
           const data = Validation.validate(
             IncomeValidation.createIncomeDetailSchema,
             detail
@@ -51,22 +54,20 @@ class IncomeService {
             data.quantityKg * data.pricePerKg
           );
 
+          await tx.incomeDetail.create({
+            data: {
+              incomeId: income.id,
+              buyerName: data.buyerName,
+              quantityKg: data.quantityKg,
+              pricePerKg: data.pricePerKg,
+              note: data.note || null,
+              totalPrice: detailTotalPrice,
+            },
+          });
+
           totalQuantityKg += data.quantityKg;
           totalPrice += detailTotalPrice;
-
-          return {
-            incomeId: income.id,
-            buyerName: data.buyerName,
-            quantityKg: data.quantityKg,
-            pricePerKg: data.pricePerKg,
-            note: data.note || null,
-            totalPrice: detailTotalPrice,
-          };
-        });
-
-        await tx.incomeDetail.createMany({
-          data: incomeDetailsData,
-        });
+        }
 
         const updatedIncome = await tx.income.update({
           where: { id: income.id },
@@ -82,7 +83,7 @@ class IncomeService {
         return updatedIncome;
       },
       {
-        timeout: 30000,
+        timeout: 60000,
       }
     );
 
@@ -99,17 +100,20 @@ class IncomeService {
       throw new ResponseError("Parameter date wajib diisi", 400);
     }
 
-    const parsedDate = new Date(date);
-    if (isNaN(parsedDate)) {
+    const parsed = dayjs.tz(date, "Asia/Makassar");
+    if (!parsed.isValid()) {
       throw new ResponseError("Format date tidak valid (YYYY-MM-DD)", 400);
     }
+
+    const start = parsed.startOf("day").toDate();
+    const end = parsed.endOf("day").toDate();
 
     const incomes = await prisma.income.findMany({
       where: {
         userId,
         createdAt: {
-          gte: startOfDay(parsedDate),
-          lte: endOfDay(parsedDate),
+          gte: start,
+          lte: end,
         },
       },
       select: {
@@ -155,12 +159,13 @@ class IncomeService {
     if (!date) throw new ResponseError("Parameter date wajib diisi", 400);
     if (!itemId) throw new ResponseError("Parameter itemId wajib diisi", 400);
 
-    const parsedDate = new Date(date);
-    if (isNaN(parsedDate))
+    const parsed = dayjs.tz(date, "Asia/Makassar");
+    if (!parsed.isValid()) {
       throw new ResponseError("Format date tidak valid (YYYY-MM-DD)", 400);
+    }
 
-    const start = startOfDay(parsedDate);
-    const end = endOfDay(parsedDate);
+    const start = parsed.startOf("day").toDate();
+    const end = parsed.endOf("day").toDate();
 
     const incomes = await prisma.income.findMany({
       where: {
@@ -433,7 +438,6 @@ class IncomeService {
           (quantityKg ?? incomeDetail.quantityKg) *
           (pricePerKg ?? incomeDetail.pricePerKg),
         note: note ?? incomeDetail.note,
-        updatedAt: new Date(),
       },
     });
 
@@ -452,7 +456,6 @@ class IncomeService {
       data: {
         totalPrice: incomeTotals._sum.totalPrice ?? 0,
         totalQuantityKg: incomeTotals._sum.quantityKg ?? 0,
-        updatedAt: new Date(),
       },
     });
 

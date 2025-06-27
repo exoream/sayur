@@ -2,7 +2,13 @@ const Validation = require("../utils/validation/validation");
 const prisma = require("../app/config/config");
 const { ResponseError } = require("../utils/response/response");
 const ExpenseValidation = require("../utils/validation/expense-validation");
-const { startOfDay, endOfDay } = require("date-fns");
+// const { startOfDay, endOfDay } = require("date-fns");
+const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const timezone = require("dayjs/plugin/timezone");
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 class ExpenseService {
   static async createExpense(request) {
@@ -36,25 +42,22 @@ class ExpenseService {
 
     let total = data.total || null;
     let totalQuantityKg = null;
-    let detailData = [];
 
-    if (data.type === "VEGETABLE" && Array.isArray(data.vegetableDetails)) {
-      // Hitung total dan totalQuantityKg secara efisien
-      detailData = data.vegetableDetails.map((detail) => {
-        const totalPrice = detail.quantityKg * detail.pricePerKg;
-        return {
-          buyerName: detail.buyerName,
-          quantityKg: detail.quantityKg,
-          pricePerKg: detail.pricePerKg,
-          note: detail.note || null,
-          totalPrice,
-        };
-      });
+    // Hitung otomatis untuk VEGETABLE
+    if (data.type === "VEGETABLE") {
+      total = 0;
+      totalQuantityKg = 0;
 
-      total = detailData.reduce((sum, d) => sum + d.totalPrice, 0);
-      totalQuantityKg = detailData.reduce((sum, d) => sum + d.quantityKg, 0);
+      for (const detail of data.vegetableDetails) {
+        const detailTotal = detail.quantityKg * detail.pricePerKg;
+        total += detailTotal;
+        totalQuantityKg += detail.quantityKg;
+
+        detail.totalPrice = detailTotal;
+      }
     }
 
+    // Transaksi penyimpanan
     const result = await prisma.$transaction(
       async (tx) => {
         const expense = await tx.expense.create({
@@ -68,21 +71,21 @@ class ExpenseService {
           },
         });
 
-        if (data.type === "VEGETABLE" && detailData.length > 0) {
-          const detailsWithExpenseId = detailData.map((detail) => ({
+        if (data.type === "VEGETABLE" && Array.isArray(data.vegetableDetails)) {
+          const detailData = data.vegetableDetails.map((detail) => ({
             ...detail,
             expenseId: expense.id,
           }));
 
           await tx.vegetableExpenseDetail.createMany({
-            data: detailsWithExpenseId,
+            data: detailData,
           });
         }
 
         return expense;
       },
       {
-        timeout: 30000,
+        timeout: 60000,
       }
     );
 
@@ -101,17 +104,21 @@ class ExpenseService {
       throw new ResponseError("Parameter date wajib diisi", 400);
     }
 
-    const parsedDate = new Date(date);
-    if (isNaN(parsedDate)) {
+    // Validasi dan parsing dengan dayjs
+    const parsed = dayjs.tz(date, "Asia/Makassar");
+    if (!parsed.isValid()) {
       throw new ResponseError("Format date tidak valid (YYYY-MM-DD)", 400);
     }
+
+    const start = parsed.startOf("day").toDate();
+    const end = parsed.endOf("day").toDate();
 
     const expenses = await prisma.expense.findMany({
       where: {
         userId,
         createdAt: {
-          gte: startOfDay(parsedDate),
-          lte: endOfDay(parsedDate),
+          gte: start,
+          lte: end,
         },
       },
       select: {
@@ -151,9 +158,7 @@ class ExpenseService {
       return acc;
     }, {});
 
-    const groupedArray = Object.values(grouped);
-
-    return groupedArray;
+    return Object.values(grouped);
   }
 
   static async getExpenseDetailsByDateAndItemId(request) {
@@ -165,26 +170,30 @@ class ExpenseService {
       throw new ResponseError("Parameter itemId wajib diisi", 400);
     }
 
-    if (!date) {
-      throw new ResponseError("Parameter date wajib diisi", 400);
-    }
-
     if (isNaN(itemId)) {
       throw new ResponseError("Parameter itemId harus berupa angka", 400);
     }
 
-    const parsedDate = new Date(date);
-    if (isNaN(parsedDate)) {
+    if (!date) {
+      throw new ResponseError("Parameter date wajib diisi", 400);
+    }
+
+    // Gunakan dayjs + Asia/Makassar timezone
+    const parsed = dayjs.tz(date, "Asia/Makassar");
+    if (!parsed.isValid()) {
       throw new ResponseError("Format date tidak valid (YYYY-MM-DD)", 400);
     }
+
+    const start = parsed.startOf("day").toDate();
+    const end = parsed.endOf("day").toDate();
 
     const expenses = await prisma.expense.findMany({
       where: {
         userId,
         itemId,
         createdAt: {
-          gte: startOfDay(parsedDate),
-          lte: endOfDay(parsedDate),
+          gte: start,
+          lte: end,
         },
       },
       include: {
@@ -517,7 +526,6 @@ class ExpenseService {
         phone: phone ?? detail.phone,
         address: address ?? detail.address,
         note: note ?? detail.note,
-        updatedAt: new Date(),
       },
     });
 
@@ -535,7 +543,6 @@ class ExpenseService {
       data: {
         totalQuantityKg: recalc._sum.quantityKg ?? 0,
         total: recalc._sum.totalPrice ?? 0,
-        updatedAt: new Date(),
       },
     });
 
