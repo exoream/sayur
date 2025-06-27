@@ -27,53 +27,64 @@ class IncomeService {
     let totalQuantityKg = 0;
     let totalPrice = 0;
 
-    const createdIncomeWithDetails = await prisma.$transaction(async (tx) => {
-      const income = await tx.income.create({
-        data: {
-          userId,
-          itemId,
-          totalQuantityKg: 0,
-          totalPrice: 0,
-          note: null,
-        },
-      });
-
-      for (const detail of incomesDetails) {
-        const data = Validation.validate(
-          IncomeValidation.createIncomeDetailSchema,
-          detail
-        );
-
-        const detailTotalPrice = Math.round(data.quantityKg * data.pricePerKg);
-
-        await tx.incomeDetail.create({
+    const createdIncomeWithDetails = await prisma.$transaction(
+      async (tx) => {
+        // Buat data income utama terlebih dahulu
+        const income = await tx.income.create({
           data: {
+            userId,
+            itemId,
+            totalQuantityKg: 0,
+            totalPrice: 0,
+            note: null,
+          },
+        });
+
+        // Persiapkan seluruh data incomeDetail dalam bentuk array
+        const incomeDetailsData = incomesDetails.map((detail) => {
+          const data = Validation.validate(
+            IncomeValidation.createIncomeDetailSchema,
+            detail
+          );
+
+          const detailTotalPrice = Math.round(
+            data.quantityKg * data.pricePerKg
+          );
+
+          totalQuantityKg += data.quantityKg;
+          totalPrice += detailTotalPrice;
+
+          return {
             incomeId: income.id,
             buyerName: data.buyerName,
             quantityKg: data.quantityKg,
             pricePerKg: data.pricePerKg,
             note: data.note || null,
             totalPrice: detailTotalPrice,
+          };
+        });
+
+        await tx.incomeDetail.createMany({
+          data: incomeDetailsData,
+        });
+
+        const updatedIncome = await tx.income.update({
+          where: { id: income.id },
+          data: {
+            totalQuantityKg,
+            totalPrice,
+          },
+          include: {
+            incomeDetails: true,
           },
         });
 
-        totalQuantityKg += data.quantityKg;
-        totalPrice += detailTotalPrice;
+        return updatedIncome;
+      },
+      {
+        timeout: 30000,
       }
-
-      const updatedIncome = await tx.income.update({
-        where: { id: income.id },
-        data: {
-          totalQuantityKg,
-          totalPrice,
-        },
-        include: {
-          incomeDetails: true,
-        },
-      });
-
-      return updatedIncome;
-    });
+    );
 
     return {
       createdIncomeWithDetails,

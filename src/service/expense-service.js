@@ -36,47 +36,55 @@ class ExpenseService {
 
     let total = data.total || null;
     let totalQuantityKg = null;
+    let detailData = [];
 
-    // Hitung otomatis untuk VEGETABLE
-    if (data.type === "VEGETABLE") {
-      total = 0;
-      totalQuantityKg = 0;
-
-      for (const detail of data.vegetableDetails) {
-        const detailTotal = detail.quantityKg * detail.pricePerKg;
-        total += detailTotal;
-        totalQuantityKg += detail.quantityKg;
-
-        detail.totalPrice = detailTotal;
-      }
-    }
-
-    // Transaksi penyimpanan
-    const result = await prisma.$transaction(async (tx) => {
-      const expense = await tx.expense.create({
-        data: {
-          userId,
-          itemId: data.itemId,
-          type: data.type,
-          total,
-          totalQuantityKg,
-          note: data.note || null,
-        },
+    if (data.type === "VEGETABLE" && Array.isArray(data.vegetableDetails)) {
+      // Hitung total dan totalQuantityKg secara efisien
+      detailData = data.vegetableDetails.map((detail) => {
+        const totalPrice = detail.quantityKg * detail.pricePerKg;
+        return {
+          buyerName: detail.buyerName,
+          quantityKg: detail.quantityKg,
+          pricePerKg: detail.pricePerKg,
+          note: detail.note || null,
+          totalPrice,
+        };
       });
 
-      if (data.type === "VEGETABLE" && Array.isArray(data.vegetableDetails)) {
-        const detailData = data.vegetableDetails.map((detail) => ({
-          ...detail,
-          expenseId: expense.id,
-        }));
+      total = detailData.reduce((sum, d) => sum + d.totalPrice, 0);
+      totalQuantityKg = detailData.reduce((sum, d) => sum + d.quantityKg, 0);
+    }
 
-        await tx.vegetableExpenseDetail.createMany({
-          data: detailData,
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const expense = await tx.expense.create({
+          data: {
+            userId,
+            itemId: data.itemId,
+            type: data.type,
+            total,
+            totalQuantityKg,
+            note: data.note || null,
+          },
         });
-      }
 
-      return expense;
-    });
+        if (data.type === "VEGETABLE" && detailData.length > 0) {
+          const detailsWithExpenseId = detailData.map((detail) => ({
+            ...detail,
+            expenseId: expense.id,
+          }));
+
+          await tx.vegetableExpenseDetail.createMany({
+            data: detailsWithExpenseId,
+          });
+        }
+
+        return expense;
+      },
+      {
+        timeout: 30000,
+      }
+    );
 
     return {
       status: true,
