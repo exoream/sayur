@@ -205,8 +205,9 @@ class RekaptulasiService {
           select: {
             itemId: true,
             type: true,
-            note: true, // for OTHER
+            note: true,
             total: true,
+            createdAt: true,
             item: {
               select: { name: true, type: true },
             },
@@ -215,6 +216,7 @@ class RekaptulasiService {
                 quantityKg: true,
                 pricePerKg: true,
                 totalPrice: true,
+                createdAt: true,
               },
             },
           },
@@ -222,6 +224,7 @@ class RekaptulasiService {
         incomes: {
           select: {
             itemId: true,
+            createdAt: true,
             item: {
               select: { name: true, type: true },
             },
@@ -231,6 +234,7 @@ class RekaptulasiService {
                 pricePerKg: true,
                 totalPrice: true,
                 note: true,
+                createdAt: true,
               },
             },
           },
@@ -251,6 +255,7 @@ class RekaptulasiService {
             item: income.item,
             totalPerItem: 0,
             totalQuantityKg: 0,
+            date: income.createdAt,
             details: [],
           };
         }
@@ -263,6 +268,7 @@ class RekaptulasiService {
             pricePerKg: detail.pricePerKg,
             totalPrice: detail.totalPrice,
             note: detail.note,
+            date: detail.createdAt,
           });
         });
       });
@@ -277,7 +283,8 @@ class RekaptulasiService {
             item: expense.item,
             totalPerItem: 0,
             totalQuantityKg: 0,
-            note: null, // only for type OTHER
+            note: null,
+            date: expense.createdAt,
             details: [],
           };
         }
@@ -295,6 +302,7 @@ class RekaptulasiService {
               quantityKg: detail.quantityKg,
               pricePerKg: detail.pricePerKg,
               totalPrice: detail.totalPrice,
+              date: detail.createdAt,
             });
           });
         }
