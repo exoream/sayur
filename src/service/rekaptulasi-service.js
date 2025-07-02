@@ -187,9 +187,7 @@ class RekaptulasiService {
 
   static async getAllUserInputs() {
     const users = await prisma.user.findMany({
-      where: {
-        role: "USER",
-      },
+      where: { role: "USER" },
       select: {
         id: true,
         name: true,
@@ -205,39 +203,114 @@ class RekaptulasiService {
         },
         expenses: {
           select: {
-            id: true,
             itemId: true,
+            type: true,
+            note: true, // for OTHER
+            total: true,
             item: {
+              select: { name: true, type: true },
+            },
+            vegetableDetails: {
               select: {
-                name: true,
-                type: true,
+                quantityKg: true,
+                pricePerKg: true,
+                totalPrice: true,
               },
             },
-            type: true,
-            totalQuantityKg: true,
-            note: true,
-            createdAt: true,
           },
         },
         incomes: {
           select: {
-            id: true,
             itemId: true,
             item: {
+              select: { name: true, type: true },
+            },
+            incomeDetails: {
               select: {
-                name: true,
-                type: true,
+                quantityKg: true,
+                pricePerKg: true,
+                totalPrice: true,
+                note: true,
               },
             },
-            totalQuantityKg: true,
-            note: true,
-            createdAt: true,
           },
         },
       },
     });
 
-    return users;
+    const result = users.map((user) => {
+      const groupedIncomes = {};
+      const groupedExpenses = {};
+
+      // Handle incomes
+      user.incomes.forEach((income) => {
+        const id = income.itemId;
+        if (!groupedIncomes[id]) {
+          groupedIncomes[id] = {
+            itemId: id,
+            item: income.item,
+            totalPerItem: 0,
+            totalQuantityKg: 0,
+            details: [],
+          };
+        }
+
+        income.incomeDetails.forEach((detail) => {
+          groupedIncomes[id].totalPerItem += detail.totalPrice;
+          groupedIncomes[id].totalQuantityKg += detail.quantityKg;
+          groupedIncomes[id].details.push({
+            quantityKg: detail.quantityKg,
+            pricePerKg: detail.pricePerKg,
+            totalPrice: detail.totalPrice,
+            note: detail.note,
+          });
+        });
+      });
+
+      // Handle expenses
+      user.expenses.forEach((expense) => {
+        const id = expense.itemId;
+
+        if (!groupedExpenses[id]) {
+          groupedExpenses[id] = {
+            itemId: id,
+            item: expense.item,
+            totalPerItem: 0,
+            totalQuantityKg: 0,
+            note: null, // only for type OTHER
+            details: [],
+          };
+        }
+
+        if (expense.type === "OTHER") {
+          groupedExpenses[id].totalPerItem += expense.total;
+          groupedExpenses[id].note = expense.note || null;
+        }
+
+        if (expense.type === "VEGETABLE") {
+          expense.vegetableDetails.forEach((detail) => {
+            groupedExpenses[id].totalPerItem += detail.totalPrice;
+            groupedExpenses[id].totalQuantityKg += detail.quantityKg;
+            groupedExpenses[id].details.push({
+              quantityKg: detail.quantityKg,
+              pricePerKg: detail.pricePerKg,
+              totalPrice: detail.totalPrice,
+            });
+          });
+        }
+      });
+
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        items: user.items,
+        incomes: Object.values(groupedIncomes),
+        expenses: Object.values(groupedExpenses),
+      };
+    });
+
+    return result;
   }
 }
 
